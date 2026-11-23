@@ -300,6 +300,9 @@ c_SRC_FILES := \
 	../../../../../apps/demo/transfer/examples/trans_data/app_trans.c \
 	../../../../../apps/demo/transfer/examples/trans_data/ble_trans.c \
 	../../../../../apps/demo/transfer/modules/app_comm_proc.c \
+	../../../../../apps/demo/transfer/modules/zjb260_app.c \
+	../../../../../apps/demo/transfer/modules/device_ble_protocol.c \
+	../../../../../apps/demo/transfer/modules/device_control.c \
 	../../../../../apps/demo/transfer/modules/bt/app_comm_ble.c \
 	../../../../../apps/demo/transfer/modules/user_cfg.c \
 	../../../../../apps/demo/transfer/version.c \

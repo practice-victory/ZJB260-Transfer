@@ -35,7 +35,7 @@
 /* 对外可读取的业务状态；建议只读，由模块统一更新。 */
 typedef struct {
     uint8_t level;          /* 当前档位：1~5 */
-    uint8_t minutes;        /* 设定时间：0、5、10、15、20分钟 */
+    uint8_t minutes;        /* 最近一次调整后的设定分钟数，可为0~20 */
     uint8_t running;        /* 1：运行；0：停止 */
     uint32_t remaining_ms; /* 剩余工作时间，单位毫秒；暂停时保持不变 */
 } device_control_state_t;
@@ -51,6 +51,13 @@ typedef struct {
 /* 初始化为1档、0分钟、停止；now_ms应与后续process使用同一时钟。 */
 void device_control_init(device_control_t *control, uint32_t now_ms);
 
+/* 设置档位或整档分钟数。成功返回1，非法值返回0。 */
+uint8_t device_control_set_level(device_control_t *control, uint8_t level);
+uint8_t device_control_set_time(device_control_t *control, uint8_t minutes);
+
+/* 暂停保留剩余时间，剩余时间为0时必须重新设时才能启动。 */
+void device_control_set_running(device_control_t *control, uint8_t running);
+
 /*
  * 周期处理按键和倒计时，建议每5~10ms从同一任务/主循环调用。
  * control：已初始化的上下文；传空指针时返回0。
@@ -62,9 +69,9 @@ void device_control_init(device_control_t *control, uint32_t now_ms);
  * 行为约定：
  * 1. key1~key4按下沿立即调整，持续按住每500ms重复，达到边界不再改变。
  * 2. 同组加减键同时按下时屏蔽该组；松开其中一个后，剩下的键视为新按下。
- * 3. 时间调整实际改变设定值时，剩余时间重置为新设定值，运行状态不变；
- *    已到上下限时再按，不重置剩余时间。
- * 4. key5只响应按下沿：暂停保留剩余时间，到时后再开始则重装设定时间。
+ * 3. 时间键以实际剩余时间为基准加减5分钟，限幅至0~20分钟；
+ *    剩余时间大于0时保持原启停状态，减到0时停止。
+ * 4. key5只响应按下沿：暂停保留剩余时间；剩余时间为0时不能启动。
  * 5. 同次调用先扣除已运行时间，再处理key1~key4，最后处理key5。
  *
  * 返回DEVICE_CHANGED_*和DEVICE_EXPIRED的组合位；无变化返回0。
@@ -78,7 +85,7 @@ uint8_t device_control_process(device_control_t *control,
 /*
  * 执行一次相对调整：key为0档位加、1档位减、2时间加、3时间减。
  * 注意传入的是下标，不是DEVICE_KEY*位掩码；其他值或空指针不执行操作。
- * 与实体按键共用限幅逻辑，不修改按键历史、连发计时和运行状态。
+ * 与实体按键共用限幅逻辑，不修改按键历史或连发计时。
  * 蓝牙调用前先周期更新倒计时，并与process在同一任务中串行执行。
  */
 void device_control_adjust(device_control_t *control, uint8_t key);
@@ -88,7 +95,7 @@ uint8_t device_control_level_value(const device_control_t *control);
 
 /*
  * 硬件层每次状态变化后读取这些值：
- * level用于数码管显示1~5；display_minutes用于时间数码管显示0/5/10/15/20；
+ * level用于数码管显示1~5；display_minutes用于时间数码管显示0~20；
  * running用于开始灯和负载启停；level_value仅是协议/业务参数，不等同于已确认的PWM值。
  * AW313的20脚GPIO、数码管段码、LED有效电平和电机驱动需在硬件资料确认后实现。
  */

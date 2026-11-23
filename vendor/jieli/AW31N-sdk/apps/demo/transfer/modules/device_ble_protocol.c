@@ -104,27 +104,15 @@ uint8_t device_ble_protocol_handle(device_ble_protocol_t *protocol,
         switch (command) {
         case DEVICE_BLE_SET_LEVEL:
             /* 小程序传20/40/60/80/100，内部仍保存1~5档。 */
-            if (!frame[4] || frame[4] % DEVICE_LEVEL_VALUE_STEP ||
-                frame[4] > DEVICE_LEVEL_MAX * DEVICE_LEVEL_VALUE_STEP) {
+            if (frame[4] % DEVICE_LEVEL_VALUE_STEP ||
+                !device_control_set_level(control, frame[4] / DEVICE_LEVEL_VALUE_STEP)) {
                 result = DEVICE_BLE_BAD_VALUE;
-            } else {
-                control->state.level = (uint8_t)(frame[4] / DEVICE_LEVEL_VALUE_STEP);
             }
             break;
         case DEVICE_BLE_SET_TIME:
             /* 时间按分钟原值传输，仅允许0、5、10、15、20。 */
-            if (frame[4] < DEVICE_TIME_MIN_MINUTES ||
-                frame[4] > DEVICE_TIME_MAX_MINUTES ||
-                (frame[4] % DEVICE_TIME_STEP_MINUTES)) {
+            if (!device_control_set_time(control, frame[4])) {
                 result = DEVICE_BLE_BAD_VALUE;
-            } else if (control->state.minutes != frame[4]) {
-                /* 与实体键一致：改变设定时间才重置剩余时间。 */
-                control->state.minutes = frame[4];
-                control->state.remaining_ms = (uint32_t)frame[4] * 60000u;
-                /* 设为0分钟即停止；非0分钟不改变当前运行/停止状态。 */
-                if (!frame[4]) {
-                    control->state.running = 0;
-                }
             }
             break;
         case DEVICE_BLE_LEVEL_UP:
@@ -143,18 +131,8 @@ uint8_t device_ble_protocol_handle(device_ble_protocol_t *protocol,
         case DEVICE_BLE_QUERY:
             if (frame[4] != 0) {
                 result = DEVICE_BLE_BAD_VALUE;
-            } else if (command == DEVICE_BLE_START) {
-                /* 0分钟是停止/待机设置，不允许蓝牙启动。 */
-                if (control->state.minutes) {
-                    /* 明确开始而非切换；停止保留剩余时间，耗尽后才重装。 */
-                    if (!control->state.remaining_ms) {
-                        control->state.remaining_ms = (uint32_t)control->state.minutes * 60000u;
-                    }
-                    control->state.running = 1;
-                }
-            } else if (command == DEVICE_BLE_PAUSE) {
-                /* 暂停等同停止，保留remaining_ms供下一次开始继续。 */
-                control->state.running = 0;
+            } else if (command != DEVICE_BLE_QUERY) {
+                device_control_set_running(control, command == DEVICE_BLE_START);
             }
             /* 查询仅组装状态，不更改设定和运行状态。 */
             break;

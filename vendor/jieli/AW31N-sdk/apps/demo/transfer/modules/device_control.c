@@ -1,49 +1,79 @@
 #include "device_control.h"
 
+#define DEVICE_MS_PER_MINUTE 60000u
+#define DEVICE_TIME_STEP_MS (DEVICE_TIME_STEP_MINUTES * DEVICE_MS_PER_MINUTE)
+#define DEVICE_TIME_MAX_MS (DEVICE_TIME_MAX_MINUTES * DEVICE_MS_PER_MINUTE)
+
+static void device_control_set_remaining(device_control_t *control, uint32_t remaining)
+{
+    control->state.remaining_ms = remaining;
+    if (!remaining) {
+        control->state.minutes = 0;
+        control->state.running = 0;
+    }
+}
+
+uint8_t device_control_set_level(device_control_t *control, uint8_t level)
+{
+    if (!control || level < DEVICE_LEVEL_MIN || level > DEVICE_LEVEL_MAX) {
+        return 0;
+    }
+    control->state.level = level;
+    return 1;
+}
+
+uint8_t device_control_set_time(device_control_t *control, uint8_t minutes)
+{
+    if (!control || minutes > DEVICE_TIME_MAX_MINUTES ||
+        minutes % DEVICE_TIME_STEP_MINUTES) {
+        return 0;
+    }
+    if (minutes != control->state.minutes) {
+        control->state.minutes = minutes;
+        device_control_set_remaining(control, (uint32_t)minutes * DEVICE_MS_PER_MINUTE);
+    }
+    return 1;
+}
+
+void device_control_set_running(device_control_t *control, uint8_t running)
+{
+    if (control) {
+        control->state.running = running && control->state.remaining_ms;
+    }
+}
+
 /* 执行一次加减操作；key是数组下标0~3，不是DEVICE_KEY*位掩码。 */
 void device_control_adjust(device_control_t *control, uint8_t key)
 {
-    uint8_t minutes;
+    uint32_t remaining;
 
     if (!control) {
         return;
     }
-    minutes = control->state.minutes;
+    remaining = control->state.remaining_ms;
 
-    /* 先判断边界再加减，避免档位或时间越界。 */
     switch (key) {
     case 0: /* key1：档位加1 */
-        if (control->state.level < DEVICE_LEVEL_MAX) {
-            control->state.level++;
-        }
-        break;
+        device_control_set_level(control, control->state.level + 1);
+        return;
     case 1:
-        if (control->state.level > DEVICE_LEVEL_MIN) {
-            control->state.level--;
-        }
-        break;
-    case 2:
-        if (minutes < DEVICE_TIME_MAX_MINUTES) {
-            minutes += DEVICE_TIME_STEP_MINUTES;
-        }
+        device_control_set_level(control, control->state.level - 1);
+        return;
+    case 2: /* 时间加5分钟，以当前剩余时间为基准。 */
+        remaining = remaining >= DEVICE_TIME_MAX_MS - DEVICE_TIME_STEP_MS
+            ? DEVICE_TIME_MAX_MS : remaining + DEVICE_TIME_STEP_MS;
         break;
     case 3:
-        if (minutes > DEVICE_TIME_MIN_MINUTES) {
-            minutes -= DEVICE_TIME_STEP_MINUTES;
-        }
+        remaining = remaining <= DEVICE_TIME_STEP_MS
+            ? 0 : remaining - DEVICE_TIME_STEP_MS;
         break;
     default:
-        break;
+        return;
     }
 
-    /* 到达上下限后minutes不变，因此继续按住不会反复重置倒计时。 */
-    if (minutes != control->state.minutes) {
-        control->state.minutes = minutes;
-        control->state.remaining_ms = (uint32_t)minutes * 60000u;
-        /* 时间减到0立即停止，避免下一次调度前仍保持运行状态。 */
-        if (!minutes) {
-            control->state.running = 0;
-        }
+    if (remaining != control->state.remaining_ms) {
+        device_control_set_remaining(control, remaining);
+        control->state.minutes = device_control_display_minutes(control);
     }
 }
 
@@ -58,7 +88,7 @@ void device_control_init(device_control_t *control, uint32_t now_ms)
     control->state.level = DEVICE_DEFAULT_LEVEL;
     control->state.minutes = DEVICE_DEFAULT_MINUTES;
     control->state.running = 0;
-    control->state.remaining_ms = (uint32_t)DEVICE_DEFAULT_MINUTES * 60000u;
+    control->state.remaining_ms = (uint32_t)DEVICE_DEFAULT_MINUTES * DEVICE_MS_PER_MINUTE;
     control->last_update_ms = now_ms;
     control->pressed_keys = 0;
     for (i = 0; i < 4; i++) {
@@ -91,8 +121,7 @@ uint8_t device_control_process(device_control_t *control,
     /* 仅运行时扣除两次调用之间的时间；暂停期间仍更新上面的时间基准。 */
     if (control->state.running) {
         if (elapsed >= control->state.remaining_ms) {
-            control->state.remaining_ms = 0;
-            control->state.running = 0;
+            device_control_set_remaining(control, 0);
             changes |= DEVICE_EXPIRED;
         } else {
             control->state.remaining_ms -= elapsed;
@@ -146,18 +175,7 @@ uint8_t device_control_process(device_control_t *control,
 
     /* key5只在新按下时切换状态，持续按住不会反复启停。 */
     if ((active & DEVICE_KEY5) && !(previous & DEVICE_KEY5)) {
-        /* 0分钟是停止/待机设置，不允许启动电机或点亮开始灯。 */
-        if (!control->state.minutes) {
-            control->state.running = 0;
-        } else if (!control->state.running) {
-            /* 到时后或停止状态无剩余时间时重装；普通暂停恢复则保留剩余值。 */
-            if (!control->state.remaining_ms) {
-                control->state.remaining_ms = (uint32_t)control->state.minutes * 60000u;
-            }
-            control->state.running = 1;
-        } else {
-            control->state.running = 0;
-        }
+        device_control_set_running(control, !control->state.running);
     }
     /* 保存冲突处理后的有效键位，供下次判断按下沿使用。 */
     control->pressed_keys = active;
@@ -194,5 +212,6 @@ uint8_t device_control_display_minutes(const device_control_t *control)
     }
     remaining = control->state.remaining_ms;
     /* 整分钟数加上不足一分钟的部分，避免剩余几十秒时提前显示0。 */
-    return (uint8_t)(remaining / 60000u + (remaining % 60000u != 0));
+    return (uint8_t)(remaining / DEVICE_MS_PER_MINUTE +
+                     (remaining % DEVICE_MS_PER_MINUTE != 0));
 }

@@ -30,6 +30,7 @@
 #include "app_comm_proc.h"
 #include "user_cfg.h"
 #include "ble_trans.h"
+#include "zjb260_app.h"
 #include "cpu_debug.h"
 #include "my_malloc.h"
 #if TCFG_NORMAL_SET_DUT_MODE_API
@@ -133,6 +134,7 @@ static void le_trans_app_start()
     clk_set("lsb", TCFG_CLOCK_LSB_HZ);
 
     clock_bt_init();
+    zjb260_app_init(jiffies_msec());
     le_trans_bt_start();
 
 #if TCFG_LED_ENABLE
@@ -151,6 +153,7 @@ static void le_trans_app_start()
     int msg[4] = {0};
     while (1) {
         get_msg(sizeof(msg) / sizeof(int), msg);
+        zjb260_app_tick(jiffies_msec());
         app_comm_process_handler(msg);
     }
 

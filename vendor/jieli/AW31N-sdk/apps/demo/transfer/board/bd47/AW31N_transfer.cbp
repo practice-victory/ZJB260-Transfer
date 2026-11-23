@@ -316,11 +316,17 @@
 <Unit filename="../../../../../apps/demo/transfer/include/app_comm_proc.h" />
 <Unit filename="../../../../../apps/demo/transfer/include/app_config.h" />
 <Unit filename="../../../../../apps/demo/transfer/include/app_main.h" />
+<Unit filename="../../../../../apps/demo/transfer/include/zjb260_app.h" />
+<Unit filename="../../../../../apps/demo/transfer/include/device_ble_protocol.h" />
+<Unit filename="../../../../../apps/demo/transfer/include/device_control.h" />
 <Unit filename="../../../../../apps/demo/transfer/include/at.h" />
 <Unit filename="../../../../../apps/demo/transfer/include/standard_hid.h" />
 <Unit filename="../../../../../apps/demo/transfer/include/user_cfg.h" />
 <Unit filename="../../../../../apps/demo/transfer/include/user_cfg_id.h" />
 <Unit filename="../../../../../apps/demo/transfer/modules/app_comm_proc.c"><Option compilerVer="CC"/></Unit>
+<Unit filename="../../../../../apps/demo/transfer/modules/zjb260_app.c"><Option compilerVer="CC"/></Unit>
+<Unit filename="../../../../../apps/demo/transfer/modules/device_ble_protocol.c"><Option compilerVer="CC"/></Unit>
+<Unit filename="../../../../../apps/demo/transfer/modules/device_control.c"><Option compilerVer="CC"/></Unit>
 <Unit filename="../../../../../apps/demo/transfer/modules/bt/app_comm_ble.c"><Option compilerVer="CC"/></Unit>
 <Unit filename="../../../../../apps/demo/transfer/modules/user_cfg.c"><Option compilerVer="CC"/></Unit>
 <Unit filename="../../../../../apps/demo/transfer/version.c"><Option compilerVer="CC"/></Unit>
