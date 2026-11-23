@@ -1,0 +1,26 @@
+# Windows 环境安装包。SDK 内自带的构建和烧录工具仍纳入版本管理。
+/vendor/jieli/*.exe
+/vendor/jieli/AW31N-sdk/.git-upstream-backup/
+
+# Code::Blocks 本地状态和编译中间文件。
+*.layout
+*.depend
+/vendor/jieli/AW31N-sdk/apps/demo/**/obj/
+/vendor/jieli/AW31N-sdk/apps/demo/**/objs/
+~$*
+
+# BD47 构建生成的文件。
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/sdk.elf*
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/sdk.bin
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/sdk.lst
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/app.bin
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/app.ld
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/app.map
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/data.bin
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/jl_isd.bin
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/jl_isd.fw
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/lowpower_overlay.bin
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/update_overlay.bin
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/update.ufw
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/download.sh
+/vendor/jieli/AW31N-sdk/apps/app/post_build/bd47/isd_config.ini
