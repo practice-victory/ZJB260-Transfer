@@ -43,6 +43,14 @@
 #define TEST_TRANS_CHANNEL_DATA      0 /*测试记录收发数据速度*/
 #define TEST_TRANS_NOTIFY_HANDLE     ATT_CHARACTERISTIC_ae02_01_VALUE_HANDLE /*主动发送hanlde,为空则不测试发数*/
 
+#if defined(CONFIG_BOARD_AW31N_DEMO) && !TEST_TRANS_CHANNEL_DATA
+#define CONFIG_ZJB260_BLE             1
+/* 由 Transfer 应用任务调用，now_ms 与面板和倒计时共用时钟。 */
+void trans_zjb260_process(uint32_t now_ms);
+#else
+#define CONFIG_ZJB260_BLE             0
+#endif
+
 #if CONFIG_BLE_HIGH_SPEED
 #define TEST_TRANS_TIMER_MS          5
 #else

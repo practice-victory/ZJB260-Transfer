@@ -164,10 +164,14 @@ static void le_trans_app_start()
     int msg[4] = {0};
     while (1) {
         get_msg(sizeof(msg) / sizeof(int), msg);
+        now_ms = le_trans_now_ms();
 #ifdef CONFIG_BOARD_AW31N_DEMO
-        zjb260_panel_process(le_trans_now_ms());
+        zjb260_panel_process(now_ms);
 #else
-        zjb260_app_tick(le_trans_now_ms());
+        zjb260_app_tick(now_ms);
+#endif
+#if CONFIG_ZJB260_BLE
+        trans_zjb260_process(now_ms);
 #endif
         app_comm_process_handler(msg);
     }

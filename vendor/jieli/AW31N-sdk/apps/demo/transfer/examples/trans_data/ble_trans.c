@@ -27,6 +27,10 @@
 #include "app_modules.h"
 #include "ble_trans.h"
 #include "ble_trans_profile.h"
+#if defined(CONFIG_ZJB260_BLE) && CONFIG_ZJB260_BLE
+#include "irq.h"
+#include "zjb260_app.h"
+#endif
 #include "led_control.h"
 #include "common_uart_control.h"
 #include "user_cfg.h"
@@ -55,6 +59,143 @@ static uint16_t trans_con_handle;
 static uint32_t trans_recieve_test_count;
 static uint32_t trans_send_test_count;
 static adv_cfg_t trans_server_adv_config;
+
+#if CONFIG_ZJB260_BLE
+#define ZJB260_BLE_SERVICE_UUID 0xae30u
+#define ZJB260_BLE_SEND_RETRY_MS 20u
+
+/* V1 每次只等一条应答。接收槽归 GATT 回调，业务状态和发送槽归应用任务。 */
+static volatile struct {
+    uint32_t session;
+    uint16_t connection;
+    uint16_t length;
+    uint8_t frame[DEVICE_BLE_REQUEST_SIZE];
+    uint8_t pending;
+    uint8_t can_send;
+} zjb260_ble_rx;
+
+static struct {
+    uint32_t session;
+    uint32_t last_attempt_ms;
+    uint8_t frame[DEVICE_BLE_RESPONSE_SIZE];
+    uint8_t length;
+} zjb260_ble_tx;
+
+static void trans_zjb260_set_connection(uint16_t connection)
+{
+    CPU_SR_ALLOC();
+    OS_ENTER_CRITICAL();
+    zjb260_ble_rx.session++;
+    zjb260_ble_rx.connection = connection;
+    zjb260_ble_rx.pending = 0;
+    zjb260_ble_rx.can_send = 0;
+    OS_EXIT_CRITICAL();
+}
+
+static void trans_zjb260_receive(uint16_t connection, const uint8_t *data, uint16_t length)
+{
+    CPU_SR_ALLOC();
+    OS_ENTER_CRITICAL();
+    if (connection && connection == zjb260_ble_rx.connection && !zjb260_ble_rx.pending) {
+        zjb260_ble_rx.length = data ? length : 0;
+        if (zjb260_ble_rx.length == DEVICE_BLE_REQUEST_SIZE) {
+            for (uint8_t i = 0; i < DEVICE_BLE_REQUEST_SIZE; i++) {
+                zjb260_ble_rx.frame[i] = data[i];
+            }
+        }
+        zjb260_ble_rx.pending = 1;
+    }
+    OS_EXIT_CRITICAL();
+}
+
+static uint8_t trans_zjb260_take_request(uint32_t session, uint8_t *frame, uint16_t *length)
+{
+    uint8_t ready;
+    CPU_SR_ALLOC();
+    OS_ENTER_CRITICAL();
+    ready = session == zjb260_ble_rx.session && zjb260_ble_rx.pending;
+    if (ready) {
+        *length = zjb260_ble_rx.length;
+        if (*length == DEVICE_BLE_REQUEST_SIZE) {
+            for (uint8_t i = 0; i < DEVICE_BLE_REQUEST_SIZE; i++) {
+                frame[i] = zjb260_ble_rx.frame[i];
+            }
+        }
+        zjb260_ble_rx.pending = 0;
+    }
+    OS_EXIT_CRITICAL();
+    return ready;
+}
+
+static uint8_t trans_zjb260_notify_enabled(uint16_t connection, uint32_t session)
+{
+    return session == zjb260_ble_rx.session &&
+           (ble_gatt_server_characteristic_ccc_get(
+                connection, ATT_CHARACTERISTIC_ae02_01_CLIENT_CONFIGURATION_HANDLE) & ATT_OP_NOTIFY);
+}
+
+static void trans_zjb260_send_reply(uint16_t connection, uint32_t session, uint32_t now_ms)
+{
+    zjb260_ble_tx.last_attempt_ms = now_ms;
+    if (!trans_zjb260_notify_enabled(connection, session)) {
+        zjb260_ble_tx.length = 0;
+        return;
+    }
+    if (!ble_comm_att_check_send(connection, zjb260_ble_tx.length)) {
+        return;
+    }
+
+    int result = ble_comm_att_send_data(connection, ATT_CHARACTERISTIC_ae02_01_VALUE_HANDLE,
+                                       zjb260_ble_tx.frame, zjb260_ble_tx.length,
+                                       ATT_OP_AUTO_READ_CCC);
+    if (result != GATT_BUFFER_FULL && result != GATT_CMD_RET_BUSY) {
+        zjb260_ble_tx.length = 0;
+    }
+}
+
+void trans_zjb260_process(uint32_t now_ms)
+{
+    uint16_t connection;
+    uint32_t session;
+    uint8_t can_send;
+    CPU_SR_ALLOC();
+    OS_ENTER_CRITICAL();
+    connection = zjb260_ble_rx.connection;
+    session = zjb260_ble_rx.session;
+    can_send = zjb260_ble_rx.can_send;
+    zjb260_ble_rx.can_send = 0;
+    OS_EXIT_CRITICAL();
+
+    if (session != zjb260_ble_tx.session) {
+        zjb260_ble_tx.session = session;
+        zjb260_ble_tx.length = 0;
+        zjb260_app_reset_ble();
+    }
+    if (!connection) {
+        return;
+    }
+    if (zjb260_ble_tx.length) {
+        if (can_send || now_ms - zjb260_ble_tx.last_attempt_ms >= ZJB260_BLE_SEND_RETRY_MS) {
+            trans_zjb260_send_reply(connection, session, now_ms);
+        }
+        if (zjb260_ble_tx.length) {
+            return;
+        }
+    }
+
+    uint8_t request[DEVICE_BLE_REQUEST_SIZE] = {0};
+    uint16_t length;
+    if (trans_zjb260_take_request(session, request, &length) &&
+        trans_zjb260_notify_enabled(connection, session)) {
+        zjb260_ble_tx.length = zjb260_app_handle_ble(now_ms, request, length,
+                                                    zjb260_ble_tx.frame, sizeof(zjb260_ble_tx.frame));
+        if (zjb260_ble_tx.length) {
+            trans_zjb260_send_reply(connection, session, now_ms);
+        }
+    }
+}
+#endif
+
 //-------------------------------------------------------------------------------------
 static uint16_t trans_att_read_callback(hci_con_handle_t connection_handle, uint16_t att_handle, uint16_t offset, uint8_t *buffer, uint16_t buffer_size);
 static int trans_att_write_callback(hci_con_handle_t connection_handle, uint16_t att_handle, uint16_t transaction_mode, uint16_t offset, uint8_t *buffer, uint16_t buffer_size);
@@ -252,6 +393,9 @@ static int trans_event_packet_handler(int event, uint8_t *packet, uint16_t size,
     /* log_info("event: %02x,size= %d\n",event,size); */
     switch (event) {
     case GATT_COMM_EVENT_CAN_SEND_NOW:
+#if CONFIG_ZJB260_BLE
+        zjb260_ble_rx.can_send = 1;
+#endif
         break;
 
     case GATT_COMM_EVENT_SERVER_INDICATION_COMPLETE:
@@ -267,6 +411,9 @@ static int trans_event_packet_handler(int event, uint8_t *packet, uint16_t size,
         led_operate(LED_CLOSE);
 #endif
         trans_con_handle = little_endian_read_16(packet, 0);
+#if CONFIG_ZJB260_BLE
+        trans_zjb260_set_connection(trans_con_handle);
+#endif
         trans_connection_update_enable = 1;
 
         log_info("connection_handle:%04x\n", little_endian_read_16(packet, 0));
@@ -311,6 +458,9 @@ static int trans_event_packet_handler(int event, uint8_t *packet, uint16_t size,
             trans_client_search_remote_stop(trans_con_handle);
 #endif
             trans_con_handle = 0;
+#if CONFIG_ZJB260_BLE
+            trans_zjb260_set_connection(0);
+#endif
         }
         break;
 
@@ -486,6 +636,12 @@ static int trans_att_write_callback(hci_con_handle_t connection_handle, uint16_t
     case ATT_CHARACTERISTIC_ae05_01_CLIENT_CONFIGURATION_HANDLE:
     case ATT_CHARACTERISTIC_ae3c_01_CLIENT_CONFIGURATION_HANDLE:
     case ATT_CHARACTERISTIC_2a05_01_CLIENT_CONFIGURATION_HANDLE:
+#if CONFIG_ZJB260_BLE
+        if (handle == ATT_CHARACTERISTIC_ae02_01_CLIENT_CONFIGURATION_HANDLE &&
+            (!buffer || offset || buffer_size != 2 || transaction_mode != ATT_TRANSACTION_MODE_NONE)) {
+            break;
+        }
+#endif
         trans_send_connetion_updata_deal(connection_handle);
         log_info("\n------write ccc:%04x,%02x\n", handle, buffer[0]);
         ble_gatt_server_characteristic_ccc_set(connection_handle, handle, buffer[0]);
@@ -503,6 +659,11 @@ static int trans_att_write_callback(hci_con_handle_t connection_handle, uint16_t
 
     case ATT_CHARACTERISTIC_ae01_01_VALUE_HANDLE:
 
+#if CONFIG_ZJB260_BLE
+        if (!offset && transaction_mode == ATT_TRANSACTION_MODE_NONE) {
+            trans_zjb260_receive(connection_handle, buffer, buffer_size);
+        }
+#else
 #if TEST_TRANS_CHANNEL_DATA
         /* putchar('R'); */
         trans_recieve_test_count += buffer_size;
@@ -529,6 +690,7 @@ static int trans_att_write_callback(hci_con_handle_t connection_handle, uint16_t
         /*     log_info("-loop send1\n"); */
         /*     ble_comm_att_send_data(connection_handle, ATT_CHARACTERISTIC_ae02_01_VALUE_HANDLE, buffer, buffer_size, ATT_OP_AUTO_READ_CCC); */
         /* } */
+#endif
         break;
 
     case ATT_CHARACTERISTIC_ae03_01_VALUE_HANDLE:
@@ -599,7 +761,11 @@ static int trans_make_set_adv_data(void)
     uint8_t *buf = trans_adv_data;
 
     offset += make_eir_packet_val(&buf[offset], offset, HCI_EIR_DATATYPE_FLAGS, FLAGS_GENERAL_DISCOVERABLE_MODE | FLAGS_EDR_NOT_SUPPORTED, 1);
+#if CONFIG_ZJB260_BLE
+    offset += make_eir_packet_val(&buf[offset], offset, HCI_EIR_DATATYPE_COMPLETE_16BIT_SERVICE_UUIDS, ZJB260_BLE_SERVICE_UUID, 2);
+#else
     offset += make_eir_packet_val(&buf[offset], offset, HCI_EIR_DATATYPE_COMPLETE_16BIT_SERVICE_UUIDS, 0xAF30, 2);
+#endif
 
     const char *gap_name = ble_comm_get_gap_name();
     uint8_t name_len = strlen(gap_name);
@@ -860,7 +1026,11 @@ void bt_ble_init(void)
     log_info("%s\n", __FUNCTION__);
     log_info("ble_file: %s", __FILE__);
 
+#if CONFIG_ZJB260_BLE
+    ble_comm_set_config_name("ZJB260", 0);
+#else
     ble_comm_set_config_name(bt_get_local_name(), 1);
+#endif
 
     trans_con_handle = 0;
     trans_server_init();
@@ -892,6 +1062,9 @@ void bt_ble_init(void)
 void bt_ble_exit(void)
 {
     log_info("%s\n", __FUNCTION__);
+#if CONFIG_ZJB260_BLE
+    trans_zjb260_set_connection(0);
+#endif
     ble_module_enable(0);
     ble_comm_exit();
 }
