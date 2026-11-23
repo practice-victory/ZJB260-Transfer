@@ -96,8 +96,7 @@ uint8_t device_control_level_value(const device_control_t *control);
 /*
  * 硬件层每次状态变化后读取这些值：
  * level用于数码管显示1~5；display_minutes用于时间数码管显示0~20；
- * running用于开始灯和负载启停；level_value仅是协议/业务参数，不等同于已确认的PWM值。
- * AW313的20脚GPIO、数码管段码、LED有效电平和电机驱动需在硬件资料确认后实现。
+ * running用于运行灯。外部电源的档位和启停按电源侧协议接入。
  */
 
 /* 剩余毫秒向上取整为显示分钟；到时显示0。 */

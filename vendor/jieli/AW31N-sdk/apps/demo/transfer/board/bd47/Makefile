@@ -272,6 +272,7 @@ c_SRC_FILES := \
 	../../../../../apps/demo/transfer/app_main.c \
 	../../../../../apps/demo/transfer/board/bd47/board_aw318n_dongle.c \
 	../../../../../apps/demo/transfer/board/bd47/board_aw31n_demo.c \
+	../../../../../apps/demo/transfer/board/bd47/board_zjb260_panel.c \
 	../../../../../apps/demo/transfer/config/lib_btctrler_config.c \
 	../../../../../apps/demo/transfer/config/lib_btstack_config.c \
 	../../../../../apps/demo/transfer/config/lib_driver_config.c \

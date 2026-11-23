@@ -6,6 +6,7 @@
 
 #ifdef CONFIG_BOARD_AW31N_DEMO
 #include "includes.h"
+#include "board_zjb260_gpio.h"
 /* #include "user_cfg.h" */
 
 #define LOG_TAG_CONST       BOARD
@@ -26,6 +27,17 @@ void board_init()
 #if (KEY_IO_EN || KEY_AD_EN || KEY_MATRIX_EN)
     key_init();
 #endif
+
+    /* 主板用外部上拉，PA3 继续用作 UART0 打印。 */
+    gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_KEY_LEVEL_UP), PORT_INPUT_FLOATING);
+    gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_KEY_TIME_UP), PORT_INPUT_FLOATING);
+    gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_KEY_TIME_DOWN), PORT_INPUT_FLOATING);
+    gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_KEY_START_PAUSE), PORT_INPUT_FLOATING);
+
+    gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_DISPLAY_SDA), PORT_INPUT_FLOATING);
+    gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_DISPLAY_CLK), PORT_INPUT_FLOATING);
+    gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_RUN_LED), PORT_OUTPUT_LOW);
+    gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_BUZZER), PORT_OUTPUT_LOW);
 }
 
 /************************** IO KEY ****************************/

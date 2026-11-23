@@ -44,7 +44,7 @@
 //                                 adkey 配置                                      //
 //*********************************************************************************//
 #define AD_KEY_IO		                    IO_PORTA_08 // 可用的IO见adc_ch_io_table
-#define KEY_AD_EN				            ENABLE           //<AD按键使能
+#define KEY_AD_EN                          DISABLE          // ZJB260 的 PA8 用作运行灯
 
 #define EXTERN_R_UP     100//220 -> 22k,外挂上拉电阻,0使用内部上拉,内部上拉为10k
 

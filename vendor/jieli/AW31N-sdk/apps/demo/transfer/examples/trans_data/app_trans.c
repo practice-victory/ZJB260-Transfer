@@ -31,6 +31,7 @@
 #include "user_cfg.h"
 #include "ble_trans.h"
 #include "zjb260_app.h"
+#include "board_zjb260_panel.h"
 #include "cpu_debug.h"
 #include "my_malloc.h"
 #if TCFG_NORMAL_SET_DUT_MODE_API
@@ -58,6 +59,12 @@ static const ble_init_cfg_t le_trans_data_config = {
     .same_address = 0,
     .appearance = 0,
 };
+
+static uint32_t le_trans_now_ms(void)
+{
+    /* 保留完整的32位毫秒计数，供应用层使用无符号时间差。 */
+    return (uint32_t)jiffies_2ms * SYS_TIMER_JIFFIES_UNIT;
+}
 
 static void le_timer_test_handle(void *priv)
 {
@@ -134,7 +141,11 @@ static void le_trans_app_start()
     clk_set("lsb", TCFG_CLOCK_LSB_HZ);
 
     clock_bt_init();
-    zjb260_app_init(jiffies_msec());
+    uint32_t now_ms = le_trans_now_ms();
+    zjb260_app_init(now_ms);
+#ifdef CONFIG_BOARD_AW31N_DEMO
+    zjb260_panel_init(now_ms);
+#endif
     le_trans_bt_start();
 
 #if TCFG_LED_ENABLE
@@ -153,7 +164,11 @@ static void le_trans_app_start()
     int msg[4] = {0};
     while (1) {
         get_msg(sizeof(msg) / sizeof(int), msg);
-        zjb260_app_tick(jiffies_msec());
+#ifdef CONFIG_BOARD_AW31N_DEMO
+        zjb260_panel_process(le_trans_now_ms());
+#else
+        zjb260_app_tick(le_trans_now_ms());
+#endif
         app_comm_process_handler(msg);
     }
 
