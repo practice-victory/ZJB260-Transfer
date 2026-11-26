@@ -28,8 +28,9 @@ void board_init()
     key_init();
 #endif
 
-    /* 主板用外部上拉，PA3 继续用作 UART0 打印。 */
+    /* 按键外部上拉，按下接地；日志 TX 已从 PA3 移到 PA7。 */
     gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_KEY_LEVEL_UP), PORT_INPUT_FLOATING);
+    gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_KEY_LEVEL_DOWN), PORT_INPUT_FLOATING);
     gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_KEY_TIME_UP), PORT_INPUT_FLOATING);
     gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_KEY_TIME_DOWN), PORT_INPUT_FLOATING);
     gpio_set_mode(IO_PORT_SPILT(ZJB260_GPIO_KEY_START_PAUSE), PORT_INPUT_FLOATING);

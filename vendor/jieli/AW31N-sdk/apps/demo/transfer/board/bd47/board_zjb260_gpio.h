@@ -7,11 +7,11 @@
 #define ZJB260_GPIO_DISPLAY_SDA      IO_PORTA_00 /* U9.9 SDA_A */
 #define ZJB260_GPIO_DISPLAY_CLK      IO_PORTA_01 /* U9.8 CLK_A */
 
-/* 按键外部上拉，按下接地。PA3 当前保留给串口日志。 */
+/* 按键外部上拉，高电平为松开，按下拉低。日志 TX 已从 PA3 移到 PA7。 */
 #define ZJB260_GPIO_KEY_LEVEL_UP     IO_PORTA_02 /* U9.7 ENG+ */
 #define ZJB260_GPIO_KEY_LEVEL_DOWN   IO_PORTA_03 /* U9.6 ENG- */
 #define ZJB260_GPIO_KEY_TIME_UP      IO_PORTA_04 /* U9.5 TIM+ */
-#define ZJB260_GPIO_KEY_TIME_DOWN    IO_PORTA_05 /* U9.4 TIM-，以芯片规格书为准 */
+#define ZJB260_GPIO_KEY_TIME_DOWN    IO_PORTA_05 /* U9.4 TIM- */
 #define ZJB260_GPIO_KEY_START_PAUSE  IO_PORTA_06 /* U9.3 STAR/STOP */
 
 /* 经三极管驱动，高电平有效。 */

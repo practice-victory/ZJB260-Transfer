@@ -173,6 +173,10 @@ static void le_trans_app_start()
 #if CONFIG_ZJB260_BLE
         trans_zjb260_process(now_ms);
 #endif
+#ifdef CONFIG_BOARD_AW31N_DEMO
+        /* 按键和蓝牙都只改业务状态，这里统一刷新数码管、运行灯和到点提示音。 */
+        zjb260_panel_apply(now_ms);
+#endif
         app_comm_process_handler(msg);
     }
 

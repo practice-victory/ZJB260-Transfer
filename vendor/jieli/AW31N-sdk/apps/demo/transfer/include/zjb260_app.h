@@ -26,4 +26,10 @@ uint8_t zjb260_app_handle_ble(uint32_t now_ms,
 /* 板级驱动读取显示和运行灯目标值。 */
 void zjb260_app_get_output(zjb260_app_output_t *output);
 
+/*
+ * 按键等非蓝牙途径改了档位/设定分钟/运行位后，取一帧主动状态通知（11字节）。
+ * 无变化或参数无效返回0；返回后由收发层通过 AE02 通知发送。
+ */
+uint8_t zjb260_app_take_status(uint8_t *buffer, uint16_t capacity);
+
 #endif

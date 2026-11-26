@@ -193,6 +193,15 @@ void trans_zjb260_process(uint32_t now_ms)
             trans_zjb260_send_reply(connection, session, now_ms);
         }
     }
+
+    /* 按键等本机操作改了状态：主动推一条全量状态，小程序无需等下一轮轮询。 */
+    if (!zjb260_ble_tx.length && trans_zjb260_notify_enabled(connection, session)) {
+        zjb260_ble_tx.length = zjb260_app_take_status(zjb260_ble_tx.frame,
+                                                     sizeof(zjb260_ble_tx.frame));
+        if (zjb260_ble_tx.length) {
+            trans_zjb260_send_reply(connection, session, now_ms);
+        }
+    }
 }
 #endif
 
